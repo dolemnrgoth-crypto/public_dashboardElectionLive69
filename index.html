@@ -189,7 +189,7 @@
                         onSnapshot(mainDocRef, (snapshot) => {
                             if (snapshot.exists()) {
                                 triggerNotifsAndMerge(snapshot.data());
-                                renderApp(); // ให้วาดหน้าจอใหม่เมื่อข้อมูลมา
+                                renderApp(); 
                                 isInitialLoad = false;
                             }
                         }, (error) => console.error("Firestore Listen Error:", error));
@@ -206,7 +206,7 @@
                 if (result.status === 'success' && result.data) {
                     const parsed = typeof result.data === 'string' ? JSON.parse(result.data) : result.data;
                     triggerNotifsAndMerge(parsed);
-                    renderApp(); // ให้วาดหน้าจอใหม่เมื่อข้อมูลมา
+                    renderApp(); 
                     isInitialLoad = false;
                 }
             } catch (err) { console.log("Fetch error:", err); }
@@ -225,22 +225,29 @@
             if (zone === 2) return Array.from({ length: 17 }, (_, i) => i + 14);
             return [];
         }
+        
         function getTotalScore(candidateId) {
+            // ของนายกฯ นำคะแนนทุกหน่วยที่ลงท้ายด้วย ID นี้มารวมกัน
             let total = 0;
             for (const [key, value] of Object.entries(state.scores)) {
                 if (key.endsWith(`_candidate_${candidateId}`)) total += parseInt(value || 0);
             }
             return total;
         }
+
+        function getCandidateScoreByZone(candidateId, zone) {
+            // ของ ส.ท. บังคับดึงคะแนนเฉพาะหน่วยที่อยู่ในเขตนั้นๆ เท่านั้น ป้องกันข้อมูลข้ามเขต
+            let total = 0;
+            getStationsForZone(zone).forEach(s => { 
+                total += parseInt(state.scores[`station_${s}_candidate_${candidateId}`] || 0); 
+            });
+            return total;
+        }
+
         function getSpecialScore(category, type, zone) {
             let total = 0;
             const stations = zone === 0 ? [...getStationsForZone(1), ...getStationsForZone(2)] : getStationsForZone(zone);
             stations.forEach(s => { total += parseInt(state.scores[`station_${s}_${category}_${type}`] || 0); });
-            return total;
-        }
-        function getMayorScoreByZone(candidateId, zone) {
-            let total = 0;
-            getStationsForZone(zone).forEach(s => { total += parseInt(state.scores[`station_${s}_candidate_${candidateId}`] || 0); });
             return total;
         }
 
@@ -258,25 +265,26 @@
             const m1Leading = m1 && m1.score > 0 && m1.score === mayorMax && m1.score > (m2?.score || 0);
             const m2Leading = m2 && m2.score > 0 && m2.score === mayorMax && m2.score > (m1?.score || 0);
 
-            const councilZone1Results = state.councilCandidates[1].map(c => ({ ...c, score: getTotalScore(c.id) }));
+            // ใช้ getCandidateScoreByZone สำหรับคำนวณคะแนน ส.ท. แยกตามเขต
+            const councilZone1Results = state.councilCandidates[1].map(c => ({ ...c, score: getCandidateScoreByZone(c.id, 1) }));
             const maxCouncil1Score = Math.max(...councilZone1Results.map(r => r.score), 1);
             const totalCouncil1 = councilZone1Results.reduce((sum, c) => sum + c.score, 0);
 
-            const councilZone2Results = state.councilCandidates[2].map(c => ({ ...c, score: getTotalScore(c.id) }));
+            const councilZone2Results = state.councilCandidates[2].map(c => ({ ...c, score: getCandidateScoreByZone(c.id, 2) }));
             const maxCouncil2Score = Math.max(...councilZone2Results.map(r => r.score), 1);
             const totalCouncil2 = councilZone2Results.reduce((sum, c) => sum + c.score, 0);
 
             const mayorNoVote = getSpecialScore('mayor', 'novote', 0);
             const mayorInvalid = getSpecialScore('mayor', 'invalid', 0);
             
-            const m1Z1 = m1 ? getMayorScoreByZone(m1.id, 1) : 0;
-            const m2Z1 = m2 ? getMayorScoreByZone(m2.id, 1) : 0;
+            const m1Z1 = m1 ? getCandidateScoreByZone(m1.id, 1) : 0;
+            const m2Z1 = m2 ? getCandidateScoreByZone(m2.id, 1) : 0;
             const tZ1 = m1Z1 + m2Z1;
             const p1Z1 = tZ1 > 0 ? ((m1Z1/tZ1)*100).toFixed(1) : "0";
             const p2Z1 = tZ1 > 0 ? ((m2Z1/tZ1)*100).toFixed(1) : "0";
 
-            const m1Z2 = m1 ? getMayorScoreByZone(m1.id, 2) : 0;
-            const m2Z2 = m2 ? getMayorScoreByZone(m2.id, 2) : 0;
+            const m1Z2 = m1 ? getCandidateScoreByZone(m1.id, 2) : 0;
+            const m2Z2 = m2 ? getCandidateScoreByZone(m2.id, 2) : 0;
             const tZ2 = m1Z2 + m2Z2;
             const p1Z2 = tZ2 > 0 ? ((m1Z2/tZ2)*100).toFixed(1) : "0";
             const p2Z2 = tZ2 > 0 ? ((m2Z2/tZ2)*100).toFixed(1) : "0";
@@ -462,17 +470,17 @@
 
                     if (isElected) {
                         sectionHtml += `
-                            <div class="w-[3rem] h-[3.5rem] sm:w-[3.5rem] sm:h-[4rem] md:w-[4rem] md:h-[4.5rem] lg:w-[4.5rem] lg:h-[5.5rem] flex flex-col items-center justify-center bg-white border-[2px] sm:border-[3px] ${theme.border} rounded-lg sm:rounded-xl shadow-md transform hover:scale-105 transition-all relative">
-                                <div class="absolute -top-2 -right-2 sm:-top-3 sm:-right-2.5 lg:-top-3.5 lg:-right-2.5 z-20 drop-shadow-md transform rotate-[15deg]"><i class="fa-solid fa-trophy text-yellow-400 text-xs sm:text-base lg:text-xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]"></i></div>
-                                <span class="text-base sm:text-xl md:text-2xl lg:text-4xl font-black ${theme.numberText} leading-none mt-0.5 sm:mt-1">${c.number}</span>
-                                <span class="text-[8px] sm:text-[9px] md:text-[10px] lg:text-[12px] font-extrabold mt-0.5 sm:mt-1 ${theme.scoreBg} px-1 sm:px-1.5 rounded w-[90%] text-center truncate shadow-inner border border-slate-200">${c.score.toLocaleString()}</span>
+                            <div class="w-[3.5rem] h-[4rem] sm:w-[4rem] sm:h-[4.5rem] lg:w-[4.5rem] lg:h-[5.5rem] flex flex-col items-center justify-center bg-white border-[2px] sm:border-[3px] ${theme.border} rounded-lg sm:rounded-xl shadow-md transform hover:scale-105 transition-all relative">
+                                <div class="absolute -top-2 -right-2 sm:-top-3 sm:-right-2.5 lg:-top-3.5 lg:-right-2.5 z-20 drop-shadow-md transform rotate-[15deg]"><i class="fa-solid fa-trophy text-yellow-400 text-sm sm:text-base lg:text-xl drop-shadow-[0_2px_2px_rgba(0,0,0,0.3)]"></i></div>
+                                <span class="text-xl sm:text-2xl lg:text-4xl font-black ${theme.numberText} leading-none mt-0.5 sm:mt-1">${c.number}</span>
+                                <span class="text-[9px] sm:text-[10px] lg:text-[12px] font-extrabold mt-0.5 sm:mt-1 ${theme.scoreBg} px-1 sm:px-1.5 rounded w-[90%] text-center truncate shadow-inner border border-slate-200">${c.score.toLocaleString()}</span>
                             </div>
                         `;
                     } else {
                         sectionHtml += `
-                            <div class="w-[3rem] h-[3.5rem] sm:w-[3.5rem] sm:h-[4rem] md:w-[4rem] md:h-[4.5rem] lg:w-[4.5rem] lg:h-[5.5rem] flex flex-col items-center justify-center bg-white/80 border-[1px] ${theme.inactiveBorder} rounded-lg sm:rounded-xl hover:opacity-100 transition-all cursor-default relative">
-                                <span class="text-base sm:text-xl md:text-2xl lg:text-4xl font-bold ${theme.inactiveText} leading-none mt-0.5 sm:mt-1">${c.number}</span>
-                                <span class="text-[8px] sm:text-[9px] md:text-[10px] lg:text-[12px] font-medium text-slate-500 mt-0.5 sm:mt-1 px-1 w-[90%] text-center truncate">${c.score.toLocaleString()}</span>
+                            <div class="w-[3.5rem] h-[4rem] sm:w-[4rem] sm:h-[4.5rem] lg:w-[4.5rem] lg:h-[5.5rem] flex flex-col items-center justify-center bg-white/80 border-[1px] ${theme.inactiveBorder} rounded-lg sm:rounded-xl hover:opacity-100 transition-all cursor-default relative">
+                                <span class="text-xl sm:text-2xl lg:text-4xl font-bold ${theme.inactiveText} leading-none mt-0.5 sm:mt-1">${c.number}</span>
+                                <span class="text-[9px] sm:text-[10px] lg:text-[12px] font-medium text-slate-500 mt-0.5 sm:mt-1 px-1 w-[90%] text-center truncate">${c.score.toLocaleString()}</span>
                             </div>
                         `;
                     }
