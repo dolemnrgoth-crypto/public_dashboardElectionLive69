@@ -200,6 +200,10 @@
 
         // --- GOOGLE SHEET SYNC (FETCH ONLY) ---
         async function fetchFromGoogleSheet() {
+            // *** จุดแก้ไขสำคัญ ***
+            // ถ้าระบบ Firebase ใช้งานได้อยู่แล้ว ให้ข้ามการดึงชีต ป้องกันข้อมูลเก่าวิ่งทับ
+            if (!state.googleSheetUrl || isFirebaseReady) return false;
+
             try {
                 const response = await fetch(state.googleSheetUrl + '?action=load');
                 const result = await response.json();
@@ -210,12 +214,14 @@
                     isInitialLoad = false;
                 }
             } catch (err) { console.log("Fetch error:", err); }
+            return false;
         }
 
         function startDashboardTimer() {
             if (dashboardInterval) clearInterval(dashboardInterval);
             dashboardInterval = setInterval(() => {
-                fetchFromGoogleSheet();
+                // ดึงข้อมูลสำรองเฉพาะตอนที่ไม่ได้ต่อ Firebase
+                if (!isFirebaseReady) fetchFromGoogleSheet();
             }, 5000);
         }
 
@@ -401,7 +407,7 @@
                                 </div>
                             </div>
                             
-                            <div class="flex flex-wrap justify-center gap-2 sm:gap-3 lg:gap-4 mt-1 text-[10px] sm:text-xs lg:text-sm font-bold text-slate-600 relative z-10">
+                            <div class="flex justify-center gap-2 sm:gap-3 lg:gap-4 mt-1 text-[10px] sm:text-xs lg:text-sm font-bold text-slate-600 relative z-10">
                                 <span class="bg-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-1 sm:gap-1.5"><i class="fa-solid fa-ban text-slate-400"></i> ไม่ประสงค์: <span class="text-slate-800 text-xs sm:text-base">${mayorNoVote.toLocaleString()}</span></span>
                                 <span class="bg-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-red-200 shadow-sm flex items-center gap-1 sm:gap-1.5 text-red-600"><i class="fa-solid fa-triangle-exclamation"></i> บัตรเสีย: <span class="text-red-700 text-xs sm:text-base">${mayorInvalid.toLocaleString()}</span></span>
                             </div>
