@@ -219,35 +219,37 @@
             }, 5000);
         }
 
-        // --- HELPERS ---
+        // --- HELPERS (อัปเดตให้เหมือนระบบหลัก) ---
         function getStationsForZone(zone) {
             if (zone === 1) return Array.from({ length: 13 }, (_, i) => i + 1);
-            if (zone === 2) return Array.from({ length: 17 }, (_, i) => i + 14);
+            if (zone === 2) return Array.from({ length: 17 }, (_, i) => i + 1); // อัปเดตเป็นหน่วย 1-17
             return [];
         }
         
         function getTotalScore(candidateId) {
-            // ของนายกฯ นำคะแนนทุกหน่วยที่ลงท้ายด้วย ID นี้มารวมกัน
             let total = 0;
             for (const [key, value] of Object.entries(state.scores)) {
-                if (key.endsWith(`_candidate_${candidateId}`)) total += parseInt(value || 0);
+                if (key.includes(`_candidate_${candidateId}`)) total += parseInt(value || 0); // เปลี่ยนมารองรับโครงสร้างคีย์ใหม่
             }
             return total;
         }
 
         function getCandidateScoreByZone(candidateId, zone) {
-            // ของ ส.ท. บังคับดึงคะแนนเฉพาะหน่วยที่อยู่ในเขตนั้นๆ เท่านั้น ป้องกันข้อมูลข้ามเขต
             let total = 0;
             getStationsForZone(zone).forEach(s => { 
-                total += parseInt(state.scores[`station_${s}_candidate_${candidateId}`] || 0); 
+                total += parseInt(state.scores[`z${zone}_s${s}_candidate_${candidateId}`] || 0); // อัปเดตคีย์ข้อมูล z_s_
             });
             return total;
         }
 
         function getSpecialScore(category, type, zone) {
             let total = 0;
-            const stations = zone === 0 ? [...getStationsForZone(1), ...getStationsForZone(2)] : getStationsForZone(zone);
-            stations.forEach(s => { total += parseInt(state.scores[`station_${s}_${category}_${type}`] || 0); });
+            const zonesToProcess = zone === 0 ? [1, 2] : [zone];
+            zonesToProcess.forEach(z => {
+                getStationsForZone(z).forEach(s => { 
+                    total += parseInt(state.scores[`z${z}_s${s}_${category}_${type}`] || 0); // อัปเดตคีย์ข้อมูล z_s_
+                });
+            });
             return total;
         }
 
@@ -265,7 +267,6 @@
             const m1Leading = m1 && m1.score > 0 && m1.score === mayorMax && m1.score > (m2?.score || 0);
             const m2Leading = m2 && m2.score > 0 && m2.score === mayorMax && m2.score > (m1?.score || 0);
 
-            // ใช้ getCandidateScoreByZone สำหรับคำนวณคะแนน ส.ท. แยกตามเขต
             const councilZone1Results = state.councilCandidates[1].map(c => ({ ...c, score: getCandidateScoreByZone(c.id, 1) }));
             const maxCouncil1Score = Math.max(...councilZone1Results.map(r => r.score), 1);
             const totalCouncil1 = councilZone1Results.reduce((sum, c) => sum + c.score, 0);
@@ -400,7 +401,7 @@
                                 </div>
                             </div>
                             
-                            <div class="flex justify-center gap-2 sm:gap-3 lg:gap-4 mt-1 text-[10px] sm:text-xs lg:text-sm font-bold text-slate-600 relative z-10">
+                            <div class="flex flex-wrap justify-center gap-2 sm:gap-3 lg:gap-4 mt-1 text-[10px] sm:text-xs lg:text-sm font-bold text-slate-600 relative z-10">
                                 <span class="bg-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-slate-200 shadow-sm flex items-center gap-1 sm:gap-1.5"><i class="fa-solid fa-ban text-slate-400"></i> ไม่ประสงค์: <span class="text-slate-800 text-xs sm:text-base">${mayorNoVote.toLocaleString()}</span></span>
                                 <span class="bg-white px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg border border-red-200 shadow-sm flex items-center gap-1 sm:gap-1.5 text-red-600"><i class="fa-solid fa-triangle-exclamation"></i> บัตรเสีย: <span class="text-red-700 text-xs sm:text-base">${mayorInvalid.toLocaleString()}</span></span>
                             </div>
